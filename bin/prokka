@@ -44,7 +44,7 @@ my @CMDLINE = ($0, @ARGV);
 my $OPSYS = $^O;
 my $BINDIR = "$FindBin::RealBin/../binaries/$OPSYS";
 my $EXE = $FindBin::RealScript;
-my $VERSION = "1.12-beta";
+my $VERSION = "1.12";
 my $AUTHOR = 'Torsten Seemann <torsten.seemann@gmail.com>';
 my $URL = 'https://github.com/tseemann/prokka';
 my $PROKKA_PMID = '24642063';
@@ -55,6 +55,14 @@ my $UNANN = 'unannotated protein';
 my $MAXCONTIGIDLEN = 37;  # Genbank rule
 my $SIGNALP_MAXSEQ = 10_000;  # maximum allowed input for signalp
 my @LOG; # buffer up log lines before we have log file ready
+
+# list of exceptions to /product annotations
+my @GOOD_PROD = (
+ 'rep',
+ 'Conserved virulence factor B',
+ 'Cypemycin N-terminal methyltransferase',
+);
+my %GOOD_PROD = (map { ($_=>1) } @GOOD_PROD);
 
 # these should accept .faa on STDIN and write report to STDOUT
 my $BLASTPCMD = "blastp -query - -db %d -evalue %e -num_threads 1 -num_descriptions 1 -num_alignments 1 -seg no";
@@ -118,7 +126,7 @@ my %tools = (
   'minced' => {
      GETVER => "minced --version | sed -n '1p'",
      REGEXP => qr/minced\s+\d+\.(\d+\.\d+)/,
-     MINVER => "1.6",
+     MINVER => "2.0",
      NEEDED => 0,
    },
   'cmscan' => {
@@ -169,6 +177,7 @@ my %tools = (
   'egrep'   => { NEEDED=>1 },
   'sed'     => { NEEDED=>1 },
   'find'    => { NEEDED=>1 },
+  'java'    => { NEEDED=>1 },
   # for the new --proteins option ability to take .gbk or .embl files
   'prokka-genbank_to_fasta_db'    => { NEEDED=>1 },
 );  
@@ -220,7 +229,7 @@ my(@Options, $quiet, $debug, $kingdom, $fast, $force, $outdir, $prefix, $cpus,
              $gcode, $gram, $gffver, $locustag, $increment, $mincontiglen, $evalue, $coverage,
              $genus, $species, $strain, $plasmid, 
              $usegenus, $proteins, $hmms, $centre, $scaffolds,
-             $rfam, $norrna, $notrna, $rnammer, $rawproduct, $noanno,
+             $rfam, $norrna, $notrna, $rnammer, $rawproduct, $noanno, $accver,
 	     $metagenome, $compliant, $listdb, $citation);
 setOptions();
 
@@ -249,6 +258,7 @@ err("Please install BioPerl $minbpver or higher") if $bpver < $minbpver;
 $noanno && $proteins and err("In --noanno mode, the --proteins will not be used!");
 $noanno && $hmms and err("In --noanno mode, the --hmms will not be used!");
 $fast && $hmms && err("In --fast mode, the --hmms will not be used");
+$accver =~ m/^\d+$/ or err("--accver must be a positive integer");
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
 # Determine CPU cores available
@@ -546,7 +556,7 @@ if ($kingdom ne 'Viruses' and !$norrna) {
   if ($tools{'barrnap'}->{HAVE}) {
     msg("Running Barrnap with $cpus threads");
     my $num_rrna=0;
-    open my $BARRNAP, '-|', "barrnap --kingdom $barrnap_mode --threads $cpus --quiet \Q$outdir/$prefix.fna\E";
+    open my $BARRNAP, '-|', "LC_ALL=C barrnap --kingdom $barrnap_mode --threads $cpus --quiet \Q$outdir/$prefix.fna\E";
     my $gff = Bio::Tools::GFF->new(-fh => $BARRNAP, -gff_version => 3);
     while (my $feat = $gff->next_feature) {
       $feat->remove_tag('Name'); # only want /product
@@ -664,10 +674,15 @@ if ($tools{'minced'}->{HAVE}) {
   open my $MINCED, '-|', "minced -gff \Q$outdir/$prefix.fna\E";
   my $gff = Bio::Tools::GFF->new(-fh => $MINCED, -gff_version => 3);
   while (my $feat = $gff->next_feature) {
+    next unless $feat->primary_tag eq 'CRISPR';
+
     # format it properly for NCBI
     $feat->primary_tag("repeat_region");
     $feat->remove_tag('ID');
     $feat->add_tag_value('rpt_family', 'CRISPR');
+    # http://www.insdc.org/controlled-vocabulary-rpttype-qualifier
+    $feat->add_tag_value('rpt_type', 'direct');
+    $feat->add_tag_value('note', 'CRISPR with '.$feat->score.' repeat units');
 
     push @{$seq{$feat->seq_id}{FEATURE}}, $feat;
 
@@ -1180,12 +1195,20 @@ msg("Assigned $num_lt locus_tags to CDS and RNA features.");
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
 # Write it all out!
 
+sub tsv_line {
+  return join("\t", @_)."\n";
+}
+
 msg("Writing outputs to $outdir/");
+
 open my $gff_fh, '>', "$outdir/$prefix.gff";
 my $faa_fh = Bio::SeqIO->new(-file=>">$outdir/$prefix.faa", -format=>'fasta');
 my $ffn_fh = Bio::SeqIO->new(-file=>">$outdir/$prefix.ffn", -format=>'fasta');
 open my $tbl_fh, '>', "$outdir/$prefix.tbl";
 my $fsa_fh = Bio::SeqIO->new(-file=>">$outdir/$prefix.fsa", -format=>'fasta');
+
+open my $tsv_fh, '>', "$outdir/$prefix.tsv";
+print {$tsv_fh} tsv_line( qw(locus_tag ftype gene EC_number product) );
 
 my $gff_factory = Bio::Tools::GFF->new(-gff_version=>$gffver);
 print $gff_fh "##gff-version $gffver\n";
@@ -1240,6 +1263,14 @@ for my $sid (@seq) {
     if ($f->primary_tag =~ m/^(CDS|rRNA|tmRNA|tRNA|misc_RNA)$/) {
       $ffn_fh->write_seq($p);
     }
+    # tab separated format.
+    print ${tsv_fh} tsv_line( map { ($_ || '') } ( 
+        TAG($f, 'locus_tag'),
+        $f->primary_tag,
+        TAG($f, 'gene'),
+        TAG($f, 'EC_number'),
+        TAG($f, 'product'),
+      ) );
   }
 }
 
@@ -1289,7 +1320,7 @@ msg("Generating Genbank and Sequin files");
 #runcmd("tbl2asn -V b -a s -A $prefix -N 1 -y 'Annotated using $EXE $VERSION from $URL' -Z $outdir/$prefix.err -i $outdir/$prefix.fsa");
 #runcmd("tbl2asn -V b -a s -N 1 -y 'Annotated using $EXE $VERSION from $URL' -Z $outdir/$prefix.err -i $outdir/$prefix.fsa 2> /dev/null");
 runcmd(
-  "tbl2asn -V b -a r10k -l paired-ends $tbl2asn_opt -N 1 -y 'Annotated using $EXE $VERSION from $URL'".
+  "tbl2asn -V b -a r10k -l paired-ends $tbl2asn_opt -N $accver -y 'Annotated using $EXE $VERSION from $URL'".
   " -Z \Q$outdir/$prefix.err\E -i \Q$outdir/$prefix.fsa\E 2> /dev/null"
 );
 delfile("$outdir/errorsummary.val");
@@ -1323,14 +1354,19 @@ msg($walltime % 2 ? "Share and enjoy!" : "Thank you, come again.");
 
 sub cleanup_product {
   my $p = shift;
-  return $p if $p eq 'rep';
-  return $HYPO if $p =~ m/DUF\d|UPF\d|conserved|domain of unknown|[CN].term|homolog|paralog/i;
-#  return $HYPO if $p =~ m/^[A-Z]+$/;
+
+  # check the whitelist first
+  return $p if exists $GOOD_PROD{$p};
+
+  return $HYPO if $p =~ m/DUF\d|UPF\d|conserved|domain of unknown|\b[CN].term|paralog/i;
   return $HYPO if $p !~ m/[a-z]/;
+
+  # eg. Leu/Ile/Val-binding protein homolog 3
+  $p =~ s/\bhomolog( \d)?\b//g;
 
   $p =~ s/^arCOG\d+\s+//;
   $p =~ s/\((EC|COG).*?\)//;
-  $p =~ s/\s+\w+\d{4,}c?//; # remove possible locus tags
+  $p =~ s/\s+\w+\d{4,}c?// unless $p =~ m/\bIS\d+\b/; # remove possible locus tags
   $p =~ s/ and (inactivated|related) \w+//;
   $p =~ s/,\s*family$//;
 
@@ -1341,6 +1377,9 @@ sub cleanup_product {
   if ($p =~ m/(domain|family|binding|fold|like|motif|repeat)\s*$/i and $p !~ m/,/)  {
     $p .= " protein";
   }
+  
+  $p =~ s/\s+/ /g;  # make multiple spaces into 1 space
+  
   return $p;
 }
 
@@ -1621,6 +1660,7 @@ sub setOptions {
     {OPT=>"gffver=i",  VAR=>\$gffver, DEFAULT=>3, DESC=>"GFF version"},
     {OPT=>"compliant!",  VAR=>\$compliant, DEFAULT=>0, DESC=>"Force Genbank/ENA/DDJB compliance: --addgenes --mincontiglen 200 --centre XXX"},
     {OPT=>"centre=s",  VAR=>\$centre, DEFAULT=>'', DESC=>"Sequencing centre ID."},
+    {OPT=>"accver=i",  VAR=>\$accver, DEFAULT=>1, DESC=>"Version to put in Genbank file"},
 #    {OPT=>"scaffolds!",  VAR=>\$scaffolds, DEFAULT=>0, DESC=>"Break scaffoldings into contigs and create .AGP file"},
     'Organism details:',
     {OPT=>"genus=s",  VAR=>\$genus, DEFAULT=>'Genus', DESC=>"Genus name"},

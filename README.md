@@ -2,7 +2,7 @@
 
 Torsten Seemann (<torsten.seemann@gmail.com>) (@torstenseemann)
 
-##Contents
+## Contents
 
 - [Introduction](#introduction)
 - [Installation](#installation)
@@ -15,34 +15,35 @@ Torsten Seemann (<torsten.seemann@gmail.com>) (@torstenseemann)
 - [Citation](#citation)
 - [Dependencies](#dependencies)
 
-##Introduction
+## Introduction
 
 Whole genome annotation is the process of identifying features of interest
 in a set of genomic DNA sequences, and labelling them with useful
 information. Prokka is a software tool to annotate bacterial, archaeal and
 viral genomes quickly and produce standards-compliant output files.
 
-##Installation
+## Installation
 
 Before the main install can begin you need to install some system packages:
 
 **Centos/Fedora/RHEL (RPM)**
 ```bash
-sudo yum install perl-Time-Piece perl-XML-Simple perl-Digest-MD5
+sudo yum install perl-Time-Piece perl-XML-Simple perl-Digest-MD5 git java perl-CPAN perl-Module-Build
+sudo cpan -i Bio::Perl  # if you don't have Bioperl installed (it will be tedious)
 ```
 **Ubuntu/Debian/Mint (APT)**
 ```bash
-sudo apt-get install libdatetime-perl libxml-simple-perl libdigest-md5-perl bioperl
+sudo apt-get install libdatetime-perl libxml-simple-perl libdigest-md5-perl git default-jre bioperl
 ```
 **Mac OS X**
 ```bash
-sudo cpan Time::Piece XML::Simple Bio::Perl Digest::MD5
+sudo cpan Time::Piece XML::Simple Digest::MD5 Bio::Perl
 ```
 
 There are currently 3 ways to install the main Prokka software: 
-[Github](#github), [Tarball](#tarball) or Homebrew(#homebrew).
+[Github](#github), [Tarball](#tarball) or [Homebrew](#homebrew).
 
-###Github
+### Github
 
 Choose somewhere to put it, for example in your home directory (no root access required):
 ```bash
@@ -58,7 +59,7 @@ Index the sequence databases
 % prokka/bin/prokka --setupdb
 ```
 
-###Homebrew
+### Homebrew
 
 Homebrew is a package manager which allows users to easily install complex software in their home directory. 
 Instructions for installing it are available for [Linux](http://linuxbrew.sh) and [Mac OS X](http://brew.sh/).
@@ -77,7 +78,7 @@ Install Prokka and all its dependencies:
 % brew install prokka --HEAD
 ```
 
-###Tarball
+### Tarball
 
 **WARNING:** this method gives you very old version of prokka. The brew or github methods are preferred!
 
@@ -92,7 +93,7 @@ Choose somewhere to put it, for example in your home directory (no root access r
 % ls prokka-1.11
 ```
 
-###Install dependencies
+### Install dependencies
 
 Prokka comes with many binaries for Linux and Mac OS X. It will always use
 your existing installed versions if they exist, but will use the included
@@ -101,21 +102,21 @@ won't work due to them being dynamically linked against new GLIBC libraries
 you don't have.  You can consult the list of dependencies later in this
 document.
 
-###Choose a rRNA predictor
+### Choose a rRNA predictor
 
-####Option 1 - Don't use one
+#### Option 1 - Don't use one
 
 If Prokka can't find a predictor for rRNA featues (either Barrnap or RNAmmer
 below) then it simply won't annotate any.  Most people don't care that much
 about them anyway,
 
-####Option 2 - Barrnap
+#### Option 2 - Barrnap
 
 This was written by the author of Prokka and is recommended if you prefer
 speed over absolute accuracy.  It uses the new multi-core NHMMER for DNA:DNA
 profile searches.  Download it from https://github.com/tseemann/barrnap
 
-####Option 3 - RNAmmer
+#### Option 3 - RNAmmer
 
 RNAmmer was written when HMMER 2.x was the latest release. Since them, HMMER
 3.x has been released, and uses the same executable binary names.  Prokka
@@ -153,15 +154,15 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
 % prokka --setupdb
 ```
 
-###Test
+### Test
 
 * Type `prokka` and it should output it's help screen.
 * Type `prokka --version` and you should see an output like `prokka 1.x`
 * Type `prokka --listdb` and it will show you what databases it has installed to use.
 
-##Invoking Prokka
+## Invoking Prokka
 
-###Beginner
+### Beginner
 ```bash
 # Vanilla (but with free toppings)
 % prokka contigs.fa
@@ -170,7 +171,7 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
 % cat PROKKA_yyyymmdd/*.txt
 ```
 
-###Moderate
+### Moderate
 ```bash
 # Choose the names of the output files
 % prokka --outdir mydir --prefix mygenome contigs.fa
@@ -179,7 +180,7 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
 % art mydir/mygenome.gff
 ```
 
-###Expert
+### Expert
 ```bash
 # It's not just for bacteria, people
 % prokka --kingdom Archaea --outdir mydir --genus Pyrococcus --locustag PYCC
@@ -188,7 +189,7 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
 % exonerate --bestn 1 zetatoxin.fasta mydir/PYCC_06072012.faa | less
 ```
 
-###Wizard
+### Wizard
 ```bash
 # Watch and learn
 % prokka --outdir mydir --locustag EHEC --proteins NewToxins.faa --evalue 0.001 --gram neg --addgenes contigs.fa
@@ -200,7 +201,7 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
 % sequin mydir/EHEC_0607201.sqn
 ```
 
-###NCBI Genbank submitter
+### NCBI Genbank submitter
 ```bash
 # Register your BioProject (e.g. PRJNA123456) and your locus_tag prefix (e.g. EHEC) first!
 % prokka --compliant --centre UoN --outdir PRJNA123456 --locustag EHEC --prefix EHEC-Chr1 contigs.fa
@@ -212,7 +213,7 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
 % sequin PRJNA123456/EHEC-Chr1.sqn
 ```
 
-###European Nucleotide Archive (ENA) submitter
+### European Nucleotide Archive (ENA) submitter
 
 ```bash
 # Register your BioProject (e.g. PRJEB12345) and your locus_tag (e.g. EHEC) prefix first!
@@ -238,7 +239,7 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
 % md5sum PRJEB12345/EHEC-Chr1.embl.gz
 ```
 
-###Crazy Person
+### Crazy Person
 ```bash
 # No stinking Perl script is going to control me
 % prokka \
@@ -252,7 +253,7 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
         plasmid-closed.fna
 ```
 
-##Output Files
+## Output Files
 
 | Extension | Description |
 | --------- | ----------- |
@@ -260,15 +261,16 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
 | .gbk | This is a standard Genbank file derived from the master .gff. If the input to prokka was a multi-FASTA, then this will be a multi-Genbank, with one record for each sequence. |
 | .fna | Nucleotide FASTA file of the input contig sequences. |
 | .faa | Protein FASTA file of the translated CDS sequences. |
-| .ffn | Nucleotide FASTA file of all the annotated sequences, not just CDS. |
+| .ffn | Nucleotide FASTA file of all the prediction transcripts (CDS, rRNA, tRNA, tmRNA, misc_RNA) |
 | .sqn | An ASN1 format "Sequin" file for submission to Genbank. It needs to be edited to set the correct taxonomy, authors, related publication etc. |
 | .fsa | Nucleotide FASTA file of the input contig sequences, used by "tbl2asn" to create the .sqn file. It is mostly the same as the .fna file, but with extra Sequin tags in the sequence description lines. |
 | .tbl | Feature Table file, used by "tbl2asn" to create the .sqn file. |
 | .err | Unacceptable annotations - the NCBI discrepancy report. |
 | .log | Contains all the output that Prokka produced during its run. This is a record of what settings you used, even if the --quiet option was enabled. |
 | .txt | Statistics relating to the annotated features found. |
+| .tsv | Tab-separated file of all features: locus_tag,ftype,gene,EC_number,product |
 
-##Command line options
+## Command line options
 
     General:
       --help            This help
@@ -316,10 +318,25 @@ export PATH=$PATH:$HOME/prokka-1.11/bin
       --notrna          Don't run tRNA search (default OFF)
       --rnammer         Prefer RNAmmer over Barrnap for rRNA prediction (default OFF)
 
+### Option: --rawproduct
 
-##Databases
+Prokka annotates proteins by using sequence similarity to other proteins in its database,
+or the databses the user provides via `--proteins`. By default, Prokka tries to "cleans" the
+`/product` names to ensure they are compliant with Genbank/ENA conventions. 
+Some of the main things it does is:
 
-###The Core (BLAST+) Databases
+* set vague names to `hypothetical protein`
+* consistifies terms like `possible`, `probable`, `predicted`, ... to `putative`
+* removes EC, COG and locus_tag identifiers 
+
+Full details can be found in the `cleanup_product()` function in the `prokka` script.
+If you feel your annotations are being ruined, try using the `--rawproduct` option, 
+and please [file an issue](https://github.com/tseemann/prokka/issues/) if you find
+an example of where it is "behaving badly" and I will fix it.
+
+## Databases
+
+### The Core (BLAST+) Databases
 
 Prokka uses a variety of databases when trying to assign function to the
 predicted CDS features.  It takes a hierarchial approach to make it fast.  
@@ -334,7 +351,7 @@ Bacteria (or Archaea or Viruses); (2) not be "Fragment" entries; and (3)
 have an evidence level ("PE") of 2 or lower, which corresponds to
 experimental mRNA or proteomics evidence.
 
-####Making a Core Databases
+#### Making a Core Databases
 
 If you want to modify these core databases, the included script
 `prokka-uniprot_to_fasta_db`, along with the official `uniprot_sprot.dat`,
@@ -342,14 +359,14 @@ can be used to generate a new database to put in `/opt/prokka/db/kingdom/`.
 If you add new ones, the command `prokka --listdb` will show you whether it
 has been detected properly.
 
-####The Genus Databases
+#### The Genus Databases
 
 If you enable `--usegenus` and also provide a Genus via `--genus` then it
 will first use a BLAST database which is Genus specific.  Prokka comes with
 a set of databases for the most common Bacterial genera; type prokka
 `--listdb` to see what they are.
 
-####Adding a Genus Databases
+#### Adding a Genus Databases
 
 If you have a set of Genbank files and want to create a new Genus database, Prokka comes with a tool called 
 `prokka-genbank_to_fasta_db` to help. For example, if you had four annotated "Coccus" genomes, you could do the following:
@@ -360,14 +377,14 @@ If you have a set of Genbank files and want to create a new Genus database, Prok
     % makeblastdb -dbtype prot -in Coccus
     % mv Coccus.p* /path/to/prokka/db/genus/
  
-###The HMM Databases
+### The HMM Databases
 
 Prokka comes with a bunch of HMM libraries for HMMER3. They are mostly
 Bacteria-specific.  They are searched after the core and genus databases. 
 You can add more simply by putting them in `/opt/prokka/db/hmm`.  Type
 `prokka --listdb` to confirm they are recognised.
 
-###FASTA database format
+### FASTA database format
 
 Prokka understands two annotation tag formats, a plain one and a detailed one.
 
@@ -401,7 +418,7 @@ The same description lines apply to HMM models, except the "NAME" and "DESC" fie
     LENG  284
     
     
-##FAQ
+## FAQ
 
 * __Where does the name "Prokka" come from?__  
 Prokka is a contraction of "prokaryotic annotation". It's also relatively unique within Google, and also rhymes with a native Australian marsupial called the quokka.
@@ -439,23 +456,23 @@ produces via the "tbl2asn" tool. The following Unix command will fix them:
 `egrep -v '^(ACCESSION|VERSION)' prokka.gbk > mauve.gbk`
 
 
-##Bugs
+## Bugs
 
-* Submit problems or requests here: https://github.com/tseeeman/prokka/issues
+* Submit problems or requests here: https://github.com/tseemann/prokka/issues
 
-##Changes
+## Changes
 
 * ChangeLog.txt: https://raw.githubusercontent.com/tseemann/prokka/master/doc/ChangeLog.txt
 * Github commits: https://github.com/tseemann/prokka/commits/master
 
-##Citation
+## Citation
 
 Seemann T.  
 *Prokka: rapid prokaryotic genome annotation*  
 **Bioinformatics** 2014 Jul 15;30(14):2068-9.
 [PMID:24642063](http://www.ncbi.nlm.nih.gov/pubmed/24642063)  
 
-##Dependencies
+## Dependencies
 
 ### Mandatory
 
@@ -474,6 +491,10 @@ _Camacho C et al. BLAST+: architecture and applications. BMC Bioinformatics. 200
 * __Prodigal__  
 Finds protein-coding features (CDS)  
 _Hyatt D et al. Prodigal: prokaryotic gene recognition and translation initiation site identification. BMC Bioinformatics. 2010 Mar 8;11:119._
+
+* __TBL2ASN__
+Prepare sequence records for Genbank submission
+[Tbl2asn home page](https://www.ncbi.nlm.nih.gov/genbank/tbl2asn2/)
 
 ### Recommended
 
